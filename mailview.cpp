@@ -62,6 +62,38 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(const mimetic::MultipartA
   }
 }
 
+class TextPlainWidget : public Gtk::TextView {
+public:
+  TextPlainWidget(const mimetic::MimeEntity &);
+
+private:
+  Glib::RefPtr<Gtk::TextBuffer> m_text_buffer;
+};
+
+TextPlainWidget::TextPlainWidget(const mimetic::MimeEntity &entity) 
+  : Gtk::TextView()
+{
+  std::string body;
+  m_text_buffer = Gtk::TextBuffer::create();
+  if (entity.hasField("Content-Transfer-Encoding")) {
+    if (entity.header().contentTransferEncoding().mechanism()
+	== "quoted-printable") {
+      mimetic::QP::Decoder qp;
+      decode(entity.body().begin(), entity.body().end(),
+	     qp,
+	     back_inserter(body));
+    } else {
+      body = entity.body();
+    }
+  } else {
+    body = entity.body();
+  }
+  set_wrap_mode(Gtk::WRAP_WORD_CHAR);
+  m_text_buffer->set_text(body);
+  set_buffer(m_text_buffer);
+}
+
+
 Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &entity) {
   mimetic::ContentType content_type = entity.header().contentType();
   if (content_type.isMultipart()) {
@@ -71,12 +103,15 @@ Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &entity) {
     } else if (content_type.subtype() == "alternative") {
       return
 	new MultipartAlternativeWidget(static_cast<const mimetic::MultipartAlternative &>(entity));
-    } else {
-      return new UnknownMimeWidget(entity);
     }
-  } else {
-    return new UnknownMimeWidget(entity);
+  } else if (content_type.type() == "text") {
+    if (content_type.subtype() == "plain") {
+      return
+	new TextPlainWidget(static_cast<const mimetic::TextPlain &>(entity));
+    }
   }
+  // fallback
+  return new UnknownMimeWidget(entity);
 }
 
 int main(int argc, char *argv[]) {

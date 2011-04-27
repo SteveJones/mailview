@@ -43,12 +43,34 @@ MultipartMixedWidget::MultipartMixedWidget(const mimetic::MultipartMixed &entity
   }
 }
 
+class MultipartAlternativeWidget : public Gtk::Notebook {
+public:
+  MultipartAlternativeWidget(const mimetic::MultipartAlternative &);
+
+private:
+  std::vector<Gtk::Widget *> m_alternates;
+};
+
+MultipartAlternativeWidget::MultipartAlternativeWidget(const mimetic::MultipartAlternative &entity)
+  : Gtk::Notebook()
+{
+  for (mimetic::MimeEntityList::const_iterator i = entity.body().parts().begin();
+       i != entity.body().parts().end();
+       ++i) {
+    m_alternates.push_back(build_mime_widget(**i));
+    append_page(*m_alternates.back(), (*i)->header().contentType().str());
+  }
+}
+
 Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &entity) {
   mimetic::ContentType content_type = entity.header().contentType();
   if (content_type.isMultipart()) {
     if (content_type.subtype() == "mixed") {
       return
 	new MultipartMixedWidget(static_cast<const mimetic::MultipartMixed &>(entity));
+    } else if (content_type.subtype() == "alternative") {
+      return
+	new MultipartAlternativeWidget(static_cast<const mimetic::MultipartAlternative &>(entity));
     } else {
       return new UnknownMimeWidget(entity);
     }

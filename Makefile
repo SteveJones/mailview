@@ -1,5 +1,5 @@
-CFLAGS=`pkg-config --cflags gtkmm-2.4` -Wall
-LDFLAGS=`pkg-config --libs gtkmm-2.4` -lmimetic
+CFLAGS=`pkg-config --cflags gtkmm-2.4` `pkg-config --cflags webkit-1.0` -Wall
+LDFLAGS=`pkg-config --libs gtkmm-2.4` `pkg-config --libs webkit-1.0` -lmimetic
 
 all: mailview
 

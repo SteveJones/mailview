@@ -3,6 +3,10 @@
 #include <iostream>
 #include <iterator>
 #include <vector>
+extern "C" {
+#include <webkit/webkit.h>
+#include <gtk/gtkscrolledwindow.h>
+}
 
 Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &);
 
@@ -62,37 +66,67 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(const mimetic::MultipartA
   }
 }
 
-class TextPlainWidget : public Gtk::TextView {
-public:
-  TextPlainWidget(const mimetic::MimeEntity &);
-
-private:
-  Glib::RefPtr<Gtk::TextBuffer> m_text_buffer;
-};
-
-TextPlainWidget::TextPlainWidget(const mimetic::MimeEntity &entity) 
-  : Gtk::TextView()
-{
-  std::string body;
-  m_text_buffer = Gtk::TextBuffer::create();
+template<class OutputIterator>
+void decode_body(const mimetic::TextEntity &entity, OutputIterator out) {
   if (entity.hasField("Content-Transfer-Encoding")) {
     if (entity.header().contentTransferEncoding().mechanism()
 	== "quoted-printable") {
       mimetic::QP::Decoder qp;
       decode(entity.body().begin(), entity.body().end(),
 	     qp,
-	     back_inserter(body));
-    } else {
-      body = entity.body();
+	     out);
+      return;
     }
-  } else {
-    body = entity.body();
   }
+  copy(entity.body().begin(), entity.body().end(), out);
+}
+
+class TextPlainWidget : public Gtk::TextView {
+public:
+  TextPlainWidget(const mimetic::TextEntity &);
+
+private:
+  Glib::RefPtr<Gtk::TextBuffer> m_text_buffer;
+};
+
+TextPlainWidget::TextPlainWidget(const mimetic::TextEntity &entity) 
+  : Gtk::TextView()
+{
+  std::string body;
+  m_text_buffer = Gtk::TextBuffer::create();
+  decode_body(entity, back_inserter(body));
   set_wrap_mode(Gtk::WRAP_WORD_CHAR);
   m_text_buffer->set_text(body);
   set_buffer(m_text_buffer);
 }
 
+class TextHTMLWidget : public Gtk::ScrolledWindow {
+public:
+  TextHTMLWidget(const mimetic::TextEntity &);
+
+private:
+  GtkWidget *m_web_view;
+};
+
+TextHTMLWidget::TextHTMLWidget(const mimetic::TextEntity &entity)
+  : Gtk::ScrolledWindow()
+{
+  m_web_view = webkit_web_view_new();
+  gtk_container_add(GTK_CONTAINER(gobj()), m_web_view);
+  std::string body;
+  decode_body(entity, back_inserter(body));
+  mimetic::ContentType content_type = entity.header().contentType();
+  std::string mimetype = "text/html";
+  std::string charset = content_type.param("charset");
+  if (charset == "") {
+    charset = "UTF-8";
+  }
+  std::cout << mimetype << std::endl;
+  webkit_web_view_load_string(WEBKIT_WEB_VIEW(m_web_view), body.c_str(),
+  			      mimetype.c_str(), charset.c_str(), NULL);
+  //webkit_web_view_load_uri(WEBKIT_WEB_VIEW(m_web_view), "http://www.google.co.uk");
+  show_all();
+}
 
 Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &entity) {
   mimetic::ContentType content_type = entity.header().contentType();
@@ -108,6 +142,9 @@ Gtk::Widget *build_mime_widget(const mimetic::MimeEntity &entity) {
     if (content_type.subtype() == "plain") {
       return
 	new TextPlainWidget(static_cast<const mimetic::TextPlain &>(entity));
+    } else if (content_type.subtype() == "html") {
+      return
+	new TextHTMLWidget(static_cast<const mimetic::TextEntity &>(entity));
     }
   }
   // fallback

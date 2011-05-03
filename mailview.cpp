@@ -170,6 +170,14 @@ TextPlainWidget::TextPlainWidget(const mimetic::TextEntity &entity)
   std::string body;
   m_text_buffer = Gtk::TextBuffer::create();
   decode_body(entity, back_inserter(body));
+  std::string charset = entity.header().contentType().param("charset");
+  if (charset == "") {
+    charset == "us-ascii";
+  }
+  if (charset != "utf-8") {
+    Glib::IConv iconv("utf-8", charset);
+    body = iconv.convert(body);
+  }
   m_text_buffer->set_text(body);
   set_wrap_mode(Gtk::WRAP_WORD_CHAR);
   set_buffer(m_text_buffer);

@@ -28,13 +28,72 @@ UnknownMimeWidget::UnknownMimeWidget(const mimetic::MimeEntity &entity)
   set_buffer(m_text_buffer);
 }
 
+class AttachmentWidget : public Gtk::VBox {
+public:
+  AttachmentWidget(const mimetic::MimeEntity *entity, Gtk::Widget *widget = NULL);
+
+private:
+  void show_inline();
+  void hide_inline();
+
+  const mimetic::MimeEntity *m_entity;
+  Gtk::Widget *m_widget;
+  Gtk::HBox m_header;
+  std::string m_filename;
+  Gtk::Label m_filename_label;
+  Gtk::Button *m_show_button;
+  sigc::connection m_button_handler;
+};
+
+AttachmentWidget::AttachmentWidget(const mimetic::MimeEntity *entity, Gtk::Widget *widget)
+  : Gtk::VBox(),
+    m_entity(entity),
+    m_widget(widget)
+{
+  mimetic::ContentDisposition content_disposition
+    = m_entity->header().contentDisposition();
+  m_filename = content_disposition.param("filename");
+  if (m_filename == "") {
+    m_filename = "unknown";
+  }
+  m_filename_label.set_text(m_filename);
+  m_header.pack_start(m_filename_label, Gtk::PACK_SHRINK, 0);
+
+  if (m_widget) {
+    m_show_button = new Gtk::Button("Show");
+    m_button_handler = m_show_button->signal_clicked()
+      .connect(sigc::mem_fun(*this, &AttachmentWidget::show_inline));
+    m_header.pack_end(*m_show_button, Gtk::PACK_SHRINK, 0);
+  }
+  pack_start(m_header, Gtk::PACK_SHRINK, 0);
+}
+
+void AttachmentWidget::show_inline()
+{
+  pack_start(*m_widget);
+  m_show_button->property_label() = "Hide";
+  m_button_handler.disconnect();
+  m_button_handler = m_show_button->signal_clicked()
+    .connect(sigc::mem_fun(*this, &AttachmentWidget::hide_inline));
+  show_all();
+}
+
+void AttachmentWidget::hide_inline()
+{
+  remove(*m_widget);
+  m_show_button->property_label() = "Show";
+  m_button_handler.disconnect();
+  m_button_handler = m_show_button->signal_clicked()
+    .connect(sigc::mem_fun(*this, &AttachmentWidget::show_inline));
+}
+
 class MultipartMixedWidget : public Gtk::ScrolledWindow {
 public:
   MultipartMixedWidget(const mimetic::MultipartMixed &);
 
 private:
   Gtk::VBox m_vbox;
-  std::vector<Gtk::Widget *> m_parts;
+  std::vector<Gtk::Widget *> m_inline_parts;
 };
 
 MultipartMixedWidget::MultipartMixedWidget(const mimetic::MultipartMixed &entity)
@@ -45,8 +104,14 @@ MultipartMixedWidget::MultipartMixedWidget(const mimetic::MultipartMixed &entity
   for (mimetic::MimeEntityList::const_iterator i = entity.body().parts().begin();
        i != entity.body().parts().end();
        ++i) {
-    m_parts.push_back(build_mime_widget(**i));
-    m_vbox.pack_start(*m_parts.back(), Gtk::PACK_EXPAND_WIDGET, 1);
+    Gtk::Widget *widget = build_mime_widget(**i);
+    if ((*i)->header().contentDisposition().type() == "attachment") {
+      AttachmentWidget *attachment_widget = new AttachmentWidget(*i, widget);
+      m_vbox.pack_start(*attachment_widget);
+    } else {
+      m_inline_parts.push_back(widget);
+      m_vbox.pack_start(*m_inline_parts.back(), Gtk::PACK_EXPAND_WIDGET, 1);
+    }
   }
 }
 

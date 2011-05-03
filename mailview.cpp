@@ -65,7 +65,10 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(const mimetic::MultipartA
        i != entity.body().parts().end();
        ++i) {
     m_alternates.push_back(build_mime_widget(**i));
-    append_page(*m_alternates.back(), (*i)->header().contentType().str());
+    Gtk::ScrolledWindow *scrolled_window = new Gtk::ScrolledWindow();
+    scrolled_window->add(*m_alternates.back());
+    scrolled_window->set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+    append_page(*scrolled_window, (*i)->header().contentType().str());
   }
 }
 
@@ -88,42 +91,37 @@ void decode_body(const mimetic::TextEntity &entity, OutputIterator out) {
   copy(entity.body().begin(), entity.body().end(), out);
 }
 
-class TextPlainWidget : public Gtk::ScrolledWindow {
+class TextPlainWidget : public Gtk::TextView {
 public:
   TextPlainWidget(const mimetic::TextEntity &);
 
 private:
-  Gtk::TextView m_text_view;
   Glib::RefPtr<Gtk::TextBuffer> m_text_buffer;
 };
 
 TextPlainWidget::TextPlainWidget(const mimetic::TextEntity &entity) 
-  : Gtk::ScrolledWindow()
+  : Gtk::TextView()
 {
-  add(m_text_view);
-  set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
   std::string body;
   m_text_buffer = Gtk::TextBuffer::create();
   decode_body(entity, back_inserter(body));
   m_text_buffer->set_text(body);
-  m_text_view.set_wrap_mode(Gtk::WRAP_WORD_CHAR);
-  m_text_view.set_buffer(m_text_buffer);
+  set_wrap_mode(Gtk::WRAP_WORD_CHAR);
+  set_buffer(m_text_buffer);
 }
 
-class TextHTMLWidget : public Gtk::ScrolledWindow {
+class TextHTMLWidget : public Gtk::Widget {
 public:
   TextHTMLWidget(const mimetic::TextEntity &);
 
 private:
-  GtkWidget *m_web_view;
+  WebKitWebView *m_web_view;
 };
 
 TextHTMLWidget::TextHTMLWidget(const mimetic::TextEntity &entity)
-  : Gtk::ScrolledWindow()
+  : Gtk::Widget(webkit_web_view_new())
 {
-  set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
-  m_web_view = webkit_web_view_new();
-  gtk_container_add(GTK_CONTAINER(gobj()), m_web_view);
+  m_web_view = WEBKIT_WEB_VIEW(gobj());
   std::string body;
   decode_body(entity, back_inserter(body));
   mimetic::ContentType content_type = entity.header().contentType();
@@ -132,8 +130,7 @@ TextHTMLWidget::TextHTMLWidget(const mimetic::TextEntity &entity)
   if (charset == "") {
     charset = "UTF-8";
   }
-  std::cout << mimetype << std::endl;
-  webkit_web_view_load_string(WEBKIT_WEB_VIEW(m_web_view), body.c_str(),
+  webkit_web_view_load_string(m_web_view, body.c_str(),
   			      mimetype.c_str(), charset.c_str(), NULL);
   //webkit_web_view_load_uri(WEBKIT_WEB_VIEW(m_web_view), "http://www.google.co.uk");
   show_all();

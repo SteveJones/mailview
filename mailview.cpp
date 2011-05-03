@@ -85,23 +85,26 @@ void decode_body(const mimetic::TextEntity &entity, OutputIterator out) {
   copy(entity.body().begin(), entity.body().end(), out);
 }
 
-class TextPlainWidget : public Gtk::TextView {
+class TextPlainWidget : public Gtk::ScrolledWindow {
 public:
   TextPlainWidget(const mimetic::TextEntity &);
 
 private:
+  Gtk::TextView m_text_view;
   Glib::RefPtr<Gtk::TextBuffer> m_text_buffer;
 };
 
 TextPlainWidget::TextPlainWidget(const mimetic::TextEntity &entity) 
-  : Gtk::TextView()
+  : Gtk::ScrolledWindow()
 {
+  add(m_text_view);
+  set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
   std::string body;
   m_text_buffer = Gtk::TextBuffer::create();
   decode_body(entity, back_inserter(body));
-  set_wrap_mode(Gtk::WRAP_WORD_CHAR);
   m_text_buffer->set_text(body);
-  set_buffer(m_text_buffer);
+  m_text_view.set_wrap_mode(Gtk::WRAP_WORD_CHAR);
+  m_text_view.set_buffer(m_text_buffer);
 }
 
 class TextHTMLWidget : public Gtk::ScrolledWindow {
@@ -115,6 +118,7 @@ private:
 TextHTMLWidget::TextHTMLWidget(const mimetic::TextEntity &entity)
   : Gtk::ScrolledWindow()
 {
+  set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
   m_web_view = webkit_web_view_new();
   gtk_container_add(GTK_CONTAINER(gobj()), m_web_view);
   std::string body;
@@ -161,6 +165,8 @@ int main(int argc, char *argv[]) {
   mimetic::MimeEntity message(begin, end);
   Gtk::Window main_window;
   Gtk::Widget *message_widget = build_mime_widget(message);
+  main_window.property_default_height() = 600;
+  main_window.property_default_width() = 800;
   main_window.add(*message_widget);
   main_window.show_all_children();
   Gtk::Main::run(main_window);

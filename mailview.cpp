@@ -28,22 +28,25 @@ UnknownMimeWidget::UnknownMimeWidget(const mimetic::MimeEntity &entity)
   set_buffer(m_text_buffer);
 }
 
-class MultipartMixedWidget : public Gtk::VBox {
+class MultipartMixedWidget : public Gtk::ScrolledWindow {
 public:
   MultipartMixedWidget(const mimetic::MultipartMixed &);
 
 private:
+  Gtk::VBox m_vbox;
   std::vector<Gtk::Widget *> m_parts;
 };
 
 MultipartMixedWidget::MultipartMixedWidget(const mimetic::MultipartMixed &entity)
-  : Gtk::VBox()
+  : Gtk::ScrolledWindow()
 {
+  set_policy(Gtk::POLICY_AUTOMATIC, Gtk::POLICY_AUTOMATIC);
+  add(m_vbox);
   for (mimetic::MimeEntityList::const_iterator i = entity.body().parts().begin();
        i != entity.body().parts().end();
        ++i) {
     m_parts.push_back(build_mime_widget(**i));
-    pack_start(*m_parts.back(), Gtk::PACK_SHRINK, 0);
+    m_vbox.pack_start(*m_parts.back(), Gtk::PACK_EXPAND_WIDGET, 1);
   }
 }
 

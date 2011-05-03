@@ -69,12 +69,16 @@ MultipartAlternativeWidget::MultipartAlternativeWidget(const mimetic::MultipartA
 template<class OutputIterator>
 void decode_body(const mimetic::TextEntity &entity, OutputIterator out) {
   if (entity.hasField("Content-Transfer-Encoding")) {
-    if (entity.header().contentTransferEncoding().mechanism()
-	== "quoted-printable") {
+    std::string content_transfer_encoding
+      = entity.header().contentTransferEncoding().mechanism();
+    if (content_transfer_encoding == "quoted-printable") {
       mimetic::QP::Decoder qp;
-      decode(entity.body().begin(), entity.body().end(),
-	     qp,
-	     out);
+      decode(entity.body().begin(), entity.body().end(), qp, out);
+      return;
+    }
+    if (content_transfer_encoding == "base64") {
+      mimetic::Base64::Decoder b64;
+      decode(entity.body().begin(), entity.body().end(), b64, out);
       return;
     }
   }

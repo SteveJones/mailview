@@ -1,5 +1,5 @@
 mailview - A program to view emails
-===
+===================================
 
 Pretty simple really, it should take an email and display its
 contents. Sadly emails are not that simple, inline pdfs, strange
